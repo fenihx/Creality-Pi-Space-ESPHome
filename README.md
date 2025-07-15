@@ -57,6 +57,9 @@ Button control is implemented by simulating button presses (shorting contacts to
 
 ### Installation
 
+> ⚠️ **Disclaimer:**  
+> You use this project at your own risk. The author does not guarantee correct operation, safety, or compatibility with your hardware. Please make sure you understand what you are doing before proceeding.
+
 1. **Assemble the circuit** according to the diagram above.
 2. **Flash ESP32** with ESPHome (tested in version 2024.12.2).
    - Main config: `esphome/creality-pi-space-plus.yaml`
@@ -158,6 +161,9 @@ ESP32 подключается к линиям I2C между дисплеем �
 ---
 
 ### Установка
+
+> ⚠️ **Дисклеймер:**  
+> Все действия вы выполняете на свой страх и риск. Автор не гарантирует работоспособность, безопасность или совместимость с вашим оборудованием. Перед началом убедитесь, что понимаете, что делаете.
 
 1. Соберите схему по схеме выше.
 2. Залейте прошивку на ESP32 через ESPHome (проверено на версии 2024.12.2).
