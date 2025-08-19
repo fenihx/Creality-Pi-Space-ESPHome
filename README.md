@@ -41,8 +41,8 @@
 ## Компоненты
 
 ### Обязательные:
-- **ESP32 D1 Wemos** — основной контроллер
-- **Преобразователь логических уровней (8-канальный)** — *критически важно!* Для безопасного подключения `ESP32` (3.3В) к логике сушилки (5В)
+- **MH-ET LIVE D1 mini ESP32 ** — основной контроллер
+- **Преобразователь логических уровней (8-канальный) на транзисторах BSS138** — *критически важно!* Для безопасного подключения `ESP32` (3.3В) к логике сушилки (5В)
 - **Транзисторы для управления кнопками:** `IRLM6402` (P-channel MOSFET)
 
 ---
@@ -187,8 +187,8 @@ Integration of the `Creality Pi Space/Plus` dryer into a smart home system using
 ### Components
 
 #### Required:
-- **ESP32 D1 Wemos** — main controller
-- **8-channel Logic Level Shifter** — *critical!* For safe connection between `ESP32` (3.3V) and the dryer's logic (5V)
+- **MH-ET LIVE D1 mini ESP32 ** — main controller
+- **8-channel Logic Level Shifter on BSS138 transistors** — *critical!* For safe connection between `ESP32` (3.3V) and the dryer's logic (5V)
 - **Transistors for button control:** `IRLM6402` (P-channel MOSFET)
 
 ---
