@@ -40,11 +40,26 @@
 
 ## Компоненты
 
-### Обязательные:
-- **MH-ET LIVE D1 mini ESP32 ** — основной контроллер
-- **Преобразователь логических уровней (8-канальный) на транзисторах BSS138** — *критически важно!* Для безопасного подключения `ESP32` (3.3В) к логике сушилки (5В)
-- **Транзисторы для управления кнопками:** `IRLM6402` (P-channel MOSFET)
+## Обязательные:
 
+- **MH-ET LIVE D1 mini ESP32** — основной контроллер  
+  <img src="https://github.com/user-attachments/assets/b410ebba-9650-4792-9717-065e449e68ef" width="300"/>
+
+- **Преобразователь логических уровней (8-канальный) на транзисторах BSS138** — критически важно!  
+  Для безопасного подключения ESP32 (3.3В) к логике сушилки (5В)  
+  <img src="https://github.com/user-attachments/assets/fec91570-8f40-4619-a886-75d88c08f431" width="300"/>
+
+- **Транзисторы для управления кнопками: IRLM6402 (P-channel MOSFET) - 4шт.**  
+  <img src="https://github.com/user-attachments/assets/d3b08c45-beb0-40bc-9302-5442669540a8" width="300"/>
+
+- **Разъем IDC-10 FEMALE — 2шт**  
+  <img src="https://github.com/user-attachments/assets/1731a3a4-d2a8-48c0-b320-c9f898723c85" width="300"/>
+
+- **Резистор 1206 SMD 1кОм — 2шт**  
+  <img src="https://github.com/user-attachments/assets/d2600122-82db-4bda-b151-c3b0502df983" width="300"/>
+
+- **Шлейф 10-pin**  
+  <img src="https://github.com/user-attachments/assets/36f8c9a9-904f-4a8b-aa15-6c38eca59e62" width="300"/>
 ---
 
 ## ⚠️ Статус проекта
@@ -186,10 +201,26 @@ Integration of the `Creality Pi Space/Plus` dryer into a smart home system using
 
 ### Components
 
-#### Required:
-- **MH-ET LIVE D1 mini ESP32 ** — main controller
-- **8-channel Logic Level Shifter on BSS138 transistors** — *critical!* For safe connection between `ESP32` (3.3V) and the dryer's logic (5V)
-- **Transistors for button control:** `IRLM6402` (P-channel MOSFET)
+## Required:
+
+- **MH-ET LIVE D1 mini ESP32** — main controller  
+  <img src="https://github.com/user-attachments/assets/b410ebba-9650-4792-9717-065e449e68ef" width="300"/>
+
+- **Logic level converter (8-channel) with BSS138 transistors** — *critical!*  
+  For safe connection of ESP32 (3.3 V) to dryer logic (5 V)  
+  <img src="https://github.com/user-attachments/assets/fec91570-8f40-4619-a886-75d88c08f431" width="300"/>
+
+- **Transistors for button control: IRLM6402 (P-channel MOSFET) — 4 pcs.**  
+  <img src="https://github.com/user-attachments/assets/d3b08c45-beb0-40bc-9302-5442669540a8" width="300"/>
+
+- **IDC-10 FEMALE connector — 2 pcs.**  
+  <img src="https://github.com/user-attachments/assets/1731a3a4-d2a8-48c0-b320-c9f898723c85" width="300"/>
+
+- **Resistor 1206 SMD 1kΩ — 2 pcs.**  
+  <img src="https://github.com/user-attachments/assets/d2600122-82db-4bda-b151-c3b0502df983" width="300"/>
+
+- **10-pin ribbon cable**  
+  <img src="https://github.com/user-attachments/assets/36f8c9a9-904f-4a8b-aa15-6c38eca59e62" width="300"/>
 
 ---
 
