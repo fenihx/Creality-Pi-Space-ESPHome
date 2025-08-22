@@ -1,3 +1,61 @@
+# ---------------------------------------------
+# 📌 PREAMBLE / IMPORTANT NOTES
+# This dashboard card is designed for controlling and monitoring the
+# Creality Space Pi Plus V2 filament dryer via Home Assistant.
+#
+# ⚠️ IMPORTANT: Replace all entity_ids below with YOUR actual entities.
+# They may have different names in your HA setup.
+#
+# ENTITY LIST:
+# 1. sensor.creality_pi_space_plus_v2_dryer_status
+#    → Main dryer status (On, Off, unavailable, etc.)
+#
+# 2. sensor.creality_pi_space_plus_v2_cursor_state
+#    → Shows current display cursor position in dryer’s UI ("PV", "SV", "Material", "Time").
+#
+# 3. sensor.creality_pi_space_plus_v2_current_temperature
+#    → Current measured drying temperature
+#
+# 4. sensor.creality_pi_space_plus_v2_set_temperature
+#    → Target drying temperature (user-set point)
+#
+# 5. sensor.creality_pi_space_plus_v2_humidity
+#    → Current measured humidity inside dryer
+#
+# 6. sensor.creality_pi_space_plus_v2_error_status
+#    → Dryer error codes (for example, "E4 – heating error")
+#
+# 7. sensor.creality_pi_space_plus_v2_material
+#    → Currently selected material preset (e.g., PLA, ABS, PETG)
+#
+# 8. sensor.creality_pi_space_plus_v2_drying_time
+#    → Remaining drying time
+#
+# 9. binary_sensor.creality_pi_space_plus_v2_script_running
+#    → Indicates if a drying script/automation is running
+#
+# 10. switch.creality_pi_space_plus_v2_enable_auto_dry
+#     → Auto Dry mode (On/Off)
+#
+# 11. switch.creality_pi_space_plus_v2_auto_power_on
+#     → Auto Power On mode (On/Off)
+#
+# 12. button.creality_pi_space_plus_v2_press_set
+#     → Emulates "SET" button press on the dryer
+#
+# 13. button.creality_pi_space_plus_v2_press_up
+#     → Emulates "UP" button press
+#
+# 14. button.creality_pi_space_plus_v2_press_down
+#     → Emulates "DOWN" button press
+#
+# 15. button.creality_pi_space_plus_v2_press_power
+#     → Emulates physical "POWER" button
+#
+# Replace these entities with your equivalents to adapt the card for your system.
+# ---------------------------------------------
+
+
 type: vertical-stack
 cards:
   - type: custom:mod-card  
