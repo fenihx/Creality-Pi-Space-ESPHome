@@ -52,14 +52,26 @@
 - **Транзисторы для управления кнопками: IRLM6402 (P-channel MOSFET) - 4шт.**  
   <img src="https://github.com/user-attachments/assets/d3b08c45-beb0-40bc-9302-5442669540a8" width="300"/>
 
-- **Разъем IDC-10 FEMALE — 2шт**  
+- **Разъем IDC-10 FEMALE — 2шт.**  
+  Обязательно убедитесь в правильности ориентации и подключения шлейфа к этим разъёмам!  
+  Ошибки подключения могут привести к замыканию или повреждению устройства.  
   <img src="https://github.com/user-attachments/assets/1731a3a4-d2a8-48c0-b320-c9f898723c85" width="300"/>
 
-- **Резистор 1206 SMD 1кОм — 2шт**  
+- **Резистор 1206 SMD 1кОм — 2шт.**  
   <img src="https://github.com/user-attachments/assets/d2600122-82db-4bda-b151-c3b0502df983" width="300"/>
 
 - **Шлейф 10-pin**  
+  Используется шлейф длиной около 10 см, ориентация разъёмов у него одинакова с обеих сторон..  
   <img src="https://github.com/user-attachments/assets/36f8c9a9-904f-4a8b-aa15-6c38eca59e62" width="300"/>
+
+- **Штыревой разъём (гребёнка) 1×10, шаг 2.54 мм, «мама» (Female Header) - 4 шт.**  
+  Опционально для монтажа на плату и подключения/вставки контроллера ESP32.  
+  <img src="https://github.com/user-attachments/assets/1144b418-4c80-4ef4-8189-504a97ff91d1" width="300"/>
+
+- **Штыревой разъём (гребёнка) 1×10, шаг 2.54 мм, «папа-папа» (Male Pin Header, Double-Sided) - 4 шт.** 
+  Используется для установки на модуль с ESP32.  
+  <img src="https://github.com/user-attachments/assets/968b135b-6545-43c5-bf3e-ff4982ca0344" width="300"/>
+  
 ---
 
 ## ⚠️ Статус проекта
@@ -206,22 +218,32 @@ Integration of the `Creality Pi Space/Plus` dryer into a smart home system using
 - **MH-ET LIVE D1 mini ESP32** — main controller  
   <img src="https://github.com/user-attachments/assets/b410ebba-9650-4792-9717-065e449e68ef" width="300"/>
 
-- **Logic level converter (8-channel) with BSS138 transistors** — *critical!*  
-  For safe connection of ESP32 (3.3 V) to dryer logic (5 V)  
+- **Logic level shifter (8-channel) based on BSS138 transistors** — critically important!  
+  Ensures safe connection between ESP32 (3.3V) and dryer logic (5V).  
   <img src="https://github.com/user-attachments/assets/fec91570-8f40-4619-a886-75d88c08f431" width="300"/>
 
-- **Transistors for button control: IRLM6402 (P-channel MOSFET) — 4 pcs.**  
+- **Transistors for button control: IRLM6402 (P-channel MOSFET) - 4 pcs.**  
   <img src="https://github.com/user-attachments/assets/d3b08c45-beb0-40bc-9302-5442669540a8" width="300"/>
 
 - **IDC-10 FEMALE connector — 2 pcs.**  
+  Make sure to double-check orientation and ribbon cable connection!  
+  Incorrect wiring may cause a short circuit or device damage.  
   <img src="https://github.com/user-attachments/assets/1731a3a4-d2a8-48c0-b320-c9f898723c85" width="300"/>
 
 - **Resistor 1206 SMD 1kΩ — 2 pcs.**  
   <img src="https://github.com/user-attachments/assets/d2600122-82db-4bda-b151-c3b0502df983" width="300"/>
 
 - **10-pin ribbon cable**  
+  A ribbon cable about 10 cm long is used, with the connector orientation being the same on both ends.
   <img src="https://github.com/user-attachments/assets/36f8c9a9-904f-4a8b-aa15-6c38eca59e62" width="300"/>
 
+- **Pin header (1×10, 2.54 mm pitch, Female Header) — 4 pcs. **  
+  Optional — for mounting on the board and inserting the ESP32 module.  
+  <img src="https://github.com/user-attachments/assets/1144b418-4c80-4ef4-8189-504a97ff91d1" width="300"/>
+
+- **Pin header (1×10, 2.54 mm pitch, Male-to-Male / Double-Sided) — 2 pcs.**  
+  Used for installing on the ESP32 module.  
+  <img src="https://github.com/user-attachments/assets/968b135b-6545-43c5-bf3e-ff4982ca0344" width="300"/>
 ---
 
 ### ⚠️ Project Status
