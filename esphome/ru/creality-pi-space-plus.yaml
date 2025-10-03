@@ -17,10 +17,21 @@ esp32:
     type: esp-idf  # Используем ESP-IDF для лучшей обработки I2C прерываний
 
 # Пользовательский компонент для перехвата I2C коммуникации
+
 external_components:
   - source:
-      type: local
+      type: git
+      url: https://github.com/fenihx/Creality-Pi-Space-ESPHome
       path: external_components
+    components: [i2c_creality_pi_dryer]
+
+# Для локального компонента
+
+#external_components:
+#  - source:
+#      type: local
+#      path: external_components
+
 
 mdns:
   disabled: false

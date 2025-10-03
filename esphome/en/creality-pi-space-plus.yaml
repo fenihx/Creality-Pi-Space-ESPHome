@@ -17,10 +17,20 @@ esp32:
     type: esp-idf  # Using ESP-IDF framework for better I2C interrupt handling
 
 # Custom component for I2C communication sniffing
+
 external_components:
   - source:
-      type: local
+      type: git
+      url: https://github.com/fenihx/Creality-Pi-Space-ESPHome
       path: external_components
+    components: [i2c_creality_pi_dryer]
+
+# Custom component for local use
+
+#external_components:
+#  - source:
+#      type: local
+#      path: external_components
 
 mdns:
   disabled: false

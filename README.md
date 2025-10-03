@@ -10,7 +10,7 @@
 
 Интеграция сушилки `Creality Pi Space/Plus` в умный дом через `Home Assistant` и `ESPHome` с расширенными возможностями визуальной индикации и защиты от ошибок.
 
-<img width="515" height="223" alt="Creality Pi Space Dryer with ESPHome integration" src="./images/ha_card.gif" />
+<img width="515" height="600" alt="Creality Pi Space Dryer with ESPHome integration" src="./images/ha_card.gif" />
 
 ---
 
@@ -189,17 +189,17 @@
 
 Пример карточки для Home Assistant:
 
-![HA Card](./images/ha_card.gif)
+<img width="515" height="600" alt="Creality Pi Space Dryer with ESPHome integration" src="./images/ha_card.gif" />
 
 > Для создания такой карточки в Home Assistant потребуется установить кастомный компонент `button-card` через HACS.
 
 Пример 3D-разводки печатной платы:
 
-![3D View](./images/PCB.JPG)
+<img src="./images/PCB.JPG" width="300"/>
 
 Пример LED рамки:
 
-![LED Frame](./images/LED Frame.JPG)
+<img src="./images/LED_Frame.JPG" width="300"/>
 
 ---
 
@@ -234,7 +234,7 @@ Monitoring and control of **Creality Pi Space** (and **Plus** version) filament 
 
 Integration of the `Creality Pi Space/Plus` dryer into a smart home system using `Home Assistant` and `ESPHome` with enhanced visual indication and error protection capabilities.
 
-<img width="515" height="223" alt="Creality Pi Space Dryer with ESPHome integration" src="./images/ha_card.gif" />
+<img width="515" height="600" alt="Creality Pi Space Dryer with ESPHome integration" src="./images/ha_card.gif" />
 
 ---
 
@@ -413,17 +413,17 @@ performance. Project updated with transition to ESP-IDF framework and addition o
 
 Home Assistant Card Example:
 
-![HA Card](./images/ha_card.gif)
+<img width="515" height="600" alt="Creality Pi Space Dryer with ESPHome integration" src="./images/ha_card.gif" />
 
 > To create this card in Home Assistant, you need to install the `button-card` custom component via HACS.
 
 3D PCB Layout Example:
 
-![3D View](./images/PCB.JPG)
+<img src="./images/PCB.JPG" width="300"/>
 
 LED Frame Example:
 
-![LED Frame](./images/LED Frame.JPG)
+<img src="./images/LED_Frame.JPG" width="300"/>
 
 ---
 
