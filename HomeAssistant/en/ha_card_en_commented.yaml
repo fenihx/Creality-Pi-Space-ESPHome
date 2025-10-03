@@ -1,0 +1,1145 @@
+# ========================================
+# DRYER CONTROL CARD
+# ========================================
+#
+# This card is designed to control a filament dryer (Creality Pi Space Plus)
+# To use with other devices, replace all sensor names with your own.
+#
+# ========================================
+# LIST OF VARIABLES TO REPLACE:
+# ========================================
+#
+# 1. MAIN SENSORS:
+#    - sensor.creality_pi_space_plus_dryer_status          → Dryer status (On/Off)
+#    - sensor.creality_pi_space_plus_cursor_state          → Current active menu (PV/SV/Material/Time)
+#    - sensor.creality_pi_space_plus_current_temperature   → Current temperature
+#    - sensor.creality_pi_space_plus_set_temperature       → Target temperature
+#    - sensor.creality_pi_space_plus_humidity              → Humidity
+#    - sensor.creality_pi_space_plus_error_status          → Error status (E1/E2/E3/E4)
+#    - sensor.creality_pi_space_plus_material              → Material type
+#    - sensor.creality_pi_space_plus_drying_time           → Drying time
+#
+# 2. SWITCHES:
+#    - binary_sensor.creality_pi_space_plus_script_running → Script execution indicator
+#    - switch.creality_pi_space_plus_enable_auto_dry       → Enable auto-dry
+#    - switch.creality_pi_space_plus_auto_power_on         → Auto power-on
+#
+# 3. CONTROL BUTTONS:
+#    - button.creality_pi_space_plus_press_set             → SET button
+#    - button.creality_pi_space_plus_press_up              → UP button
+#    - button.creality_pi_space_plus_press_down            → DOWN button
+#    - button.creality_pi_space_plus_press_power           → POWER button
+#    - button.creality_pi_space_plus_start_script          → Start full cycle
+#    - button.creality_pi_space_plus_cancel_script_and_stop → Cancel and stop
+#
+# 4. SELECTS AND NUMBERS:
+#    - select.creality_pi_space_plus_select_material       → Material selection dropdown
+#    - number.creality_pi_space_plus_set_drying_time       → Set drying time (slider)
+#
+# ========================================
+# HOW TO ADAPT FOR YOUR DEVICE:
+# ========================================
+#
+# 1. Use search and replace (Ctrl+H) in your editor
+# 2. Replace "creality_pi_space_plus" with your device prefix
+# 3. Verify that all sensors exist in your system
+# 4. Remove sensors that don't exist (e.g., error_status or script_running)
+# 5. Change colors and sizes to match your design (color #7fff00 is lime green)
+#
+# ========================================
+# REQUIRED CUSTOM COMPONENTS:
+# ========================================
+#
+# Install via HACS:
+# - custom:button-card       → Main card for buttons
+# - custom:mod-card          → For card styling
+# - custom:mini-graph-card   → Temperature and humidity graph
+#
+# ========================================
+
+
+type: vertical-stack
+# Card type: vertical stack (elements arranged top to bottom)
+cards:
+# Start of the list of cards inside the stack
+
+  # Main block with information and controls
+  - type: custom:mod-card
+    style: |
+      ha-card {
+        background-color: #000000;
+        border: 2px solid #ffffff;
+        border-radius: 8px;
+        padding: 10px;
+      }
+    card:
+      type: grid
+      columns: 1
+      square: false
+      cards:
+
+        # Horizontal row for displaying PV (current temperature) with cursor indicator
+        - type: horizontal-stack
+          cards:
+            - type: custom:button-card
+              entity: sensor.creality_pi_space_plus_cursor_state
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  return (entity.state === 'PV') ? '▶' : ' ';
+                ]]]
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - width: 20px
+                  - height: 20px
+                  - justify-content: flex-end
+                  - align-items: flex-start
+                  - font-family: monospace
+                  - font-size: 16px
+                  - color: "#7fff00"
+                label:
+                  - justify-self: end
+                  - text-align: right
+                  - padding: 0
+            - type: custom:button-card
+              name: "PV:"
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: true
+              # Show/hide name label
+              show_label: false
+              # Show/hide additional label
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - justify-content: flex-start
+                  - align-items: flex-start
+                  - text-align: left
+                  - font-family: monospace
+                  - font-size: 16px
+                name:
+                  - justify-self: start
+                  - text-align: left
+                  - padding: 0
+                  - color: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : '#7fff00';
+                      ]]]
+            - type: custom:button-card
+
+              # Display current temperature with error handling (E1, E2, E3, E4)
+              entity: sensor.creality_pi_space_plus_current_temperature
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+                - sensor.creality_pi_space_plus_error_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - padding: 0
+                  - font-family: monospace
+                  - font-size: 16px
+                  - justify-content: flex-start
+                  - align-items: flex-start
+                  - text-align: left
+                  - border: |
+                      [[[
+                        const errEnt = states['sensor.creality_pi_space_plus_error_status'];
+                        const error = errEnt ? errEnt.state : null;
+                        return (error && ['E1', 'E2', 'E3', 'E4'].includes(error)) ? '1px solid red' : 'none';
+                      ]]]
+                  - border-radius: |
+                      [[[
+                        const errEnt = states['sensor.creality_pi_space_plus_error_status'];
+                        const error = errEnt ? errEnt.state : null;
+                        return (error && ['E1', 'E2', 'E3', 'E4'].includes(error)) ? '12px' : '0';
+                      ]]]
+                label:
+                  - padding: 0px 0px
+                  - justify-self: start
+                  - text-align: left
+                  - color: |
+                      [[[
+                        const errEnt = states['sensor.creality_pi_space_plus_error_status'];
+                        const error = errEnt ? errEnt.state : null;
+                        return (error && ['E1', 'E2', 'E3', 'E4'].includes(error)) ? 'red' : '#7fff00';
+                      ]]]
+                  - animation: |
+                      [[[
+                        const errEnt = states['sensor.creality_pi_space_plus_error_status'];
+                        const error = errEnt ? errEnt.state : null;
+                        return (error && ['E1', 'E2', 'E3', 'E4'].includes(error)) ? 'blink 1s infinite' : 'none';
+                      ]]]
+              label: |
+                [[[
+                  const errEnt = states['sensor.creality_pi_space_plus_error_status'];
+                  const statEnt = states['sensor.creality_pi_space_plus_dryer_status'];
+                  const error = errEnt ? errEnt.state : null;
+                  const status = statEnt ? statEnt.state : null;
+
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  
+                  if (error === 'E1') return 'E1 — Over heat';
+                  if (error === 'E2') return 'E2 — Short';
+                  if (error === 'E3') return 'E3 — SW Err';
+                  if (error === 'E4') return 'E4 — Heat Err';
+
+                  return entity && entity.state && entity.state !== 'unknown'
+                    ? entity.state + '°C'
+                    : '';
+                ]]]
+              extra_styles: |
+                @keyframes blink {
+                  0% { opacity: 1; }
+                  50% { opacity: 0.2; }
+                  100% { opacity: 1; }
+                }
+            - type: custom:button-card
+
+              # Display humidity percentage
+              entity: sensor.creality_pi_space_plus_humidity
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  return entity.state + '%';
+                ]]]
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - justify-content: flex-start
+                  - align-items: flex-start
+                  - text-align: left
+                  - font-family: monospace
+                  - font-size: 16px
+                  - color: "#7fff00"
+                  - min-height: 23px
+                label:
+                  - justify-self: start
+                  - text-align: left
+                  - padding: 0
+
+        # Horizontal row for displaying PV (current temperature) with cursor indicator
+        - type: horizontal-stack
+          cards:
+            - type: custom:button-card
+              entity: sensor.creality_pi_space_plus_cursor_state
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  return (entity.state === 'SV') ? '▶' : ' ';
+                ]]]
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - width: 20px
+                  - height: 20px
+                  - justify-content: flex-end
+                  - align-items: flex-start
+                  - font-family: monospace
+                  - font-size: 16px
+                  - color: "#7fff00"
+                label:
+                  - justify-self: end
+                  - text-align: right
+                  - padding: 0
+            - type: custom:button-card
+              name: "SV:"
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: true
+              # Show/hide name label
+              show_label: false
+              # Show/hide additional label
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - justify-content: flex-start
+                  - align-items: flex-start
+                  - text-align: left
+                  - font-family: monospace
+                  - font-size: 16px
+                name:
+                  - justify-self: start
+                  - text-align: left
+                  - padding: 0
+                  - color: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : '#7fff00';
+                      ]]]
+            - type: custom:button-card
+
+              # Display target (set) temperature
+              entity: sensor.creality_pi_space_plus_set_temperature
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  return entity.state + '°C';
+                ]]]
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - justify-content: flex-start
+                  - align-items: flex-start
+                  - text-align: left
+                  - font-family: monospace
+                  - font-size: 16px
+                  - color: "#7fff00"
+                label:
+                  - justify-self: start
+                  - text-align: left
+                  - padding: 0
+            - type: custom:button-card
+
+              # Indicator showing if automation script is running
+              entity: binary_sensor.creality_pi_space_plus_script_running
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  return entity.state === 'on' ? 'SCRIPT' : '';
+                ]]]
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return 'none';
+                        return entity.state === 'on' ? '1px solid red' : 'none';
+                      ]]]
+                  - border-radius: 15px
+                  - padding: 2px 8px
+                  - justify-content: center
+                  - align-items: center
+                  - text-align: center
+                  - min-width: 60px
+                  - min-height: 23px
+                label:
+                  - color: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return 'transparent';
+                        return entity.state === 'on' ? 'red' : 'transparent';
+                      ]]]
+                  - font-size: 11px
+                  - font-weight: bold
+                  - font-family: monospace
+                  - height: 14px
+                  - line-height: 14px
+                  - animation: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return 'none';
+                        return entity.state === 'on' ? 'blink 1s infinite' : 'none';
+                      ]]]
+              extra_styles: |
+                @keyframes blink {
+                  0% { opacity: 1; }
+                  50% { opacity: 0.3; }
+                  100% { opacity: 1; }
+                }
+
+        # Horizontal row for displaying PV (current temperature) with cursor indicator
+        - type: horizontal-stack
+          cards:
+            - type: custom:button-card
+              entity: sensor.creality_pi_space_plus_cursor_state
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  return (entity.state === 'Material') ? '▶' : ' ';
+                ]]]
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - width: 20px
+                  - height: 20px
+                  - min-height: 23px
+                  - justify-content: flex-end
+                  - align-items: flex-start
+                  - font-family: monospace
+                  - font-size: 16px
+                  - color: "#7fff00"
+                label:
+                  - justify-self: end
+                  - text-align: right
+                  - padding: 0
+            - type: custom:button-card
+              name: "Material:"
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: true
+              # Show/hide name label
+              show_label: false
+              # Show/hide additional label
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - justify-content: flex-start
+                  - align-items: flex-start
+                  - text-align: left
+                  - font-family: monospace
+                  - font-size: 16px
+                name:
+                  - justify-self: start
+                  - text-align: left
+                  - padding: 0
+                  - color: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : '#7fff00';
+                      ]]]
+            - type: custom:button-card
+
+              # Display current material type
+              entity: sensor.creality_pi_space_plus_material
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  return entity.state;
+                ]]]
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - justify-content: flex-start
+                  - align-items: flex-start
+                  - text-align: left
+                  - font-family: monospace
+                  - font-size: 16px
+                  - color: "#7fff00"
+                label:
+                  - justify-self: start
+                  - text-align: left
+                  - padding: 0
+            - type: custom:button-card
+
+              # Toggle for automatic drying mode
+              entity: switch.creality_pi_space_plus_enable_auto_dry
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: AUTO DRY
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        if (!status || ['unavailable', 'unknown'].includes(status)) return '1px solid #808080';
+                        return entity.state === 'on' ? '1px solid orange' : '1px solid #808080';
+                      ]]]
+                  - border-radius: 15px
+                  - padding: 2px 8px
+                  - justify-content: center
+                  - align-items: center
+                  - text-align: center
+                  - min-width: 80px
+                  - min-height: 23px
+                label:
+                  - color: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        if (!status || ['unavailable', 'unknown'].includes(status)) return '#808080';
+                        return entity.state === 'on' ? 'orange' : '#808080';
+                      ]]]
+                  - font-size: 10px
+                  - font-weight: bold
+                  - font-family: monospace
+                  - height: 14px
+                  - line-height: 14px
+
+        # Horizontal row for displaying PV (current temperature) with cursor indicator
+        - type: horizontal-stack
+          cards:
+            - type: custom:button-card
+              entity: sensor.creality_pi_space_plus_cursor_state
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  return (entity.state === 'Time') ? '▶' : ' ';
+                ]]]
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - width: 20px
+                  - height: 20px
+                  - justify-content: flex-end
+                  - align-items: flex-start
+                  - font-family: monospace
+                  - font-size: 16px
+                  - color: "#7fff00"
+                label:
+                  - justify-self: end
+                  - text-align: right
+                  - padding: 0
+            - type: custom:button-card
+              name: "Time:"
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: true
+              # Show/hide name label
+              show_label: false
+              # Show/hide additional label
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - justify-content: flex-start
+                  - align-items: flex-start
+                  - text-align: left
+                  - font-family: monospace
+                  - font-size: 16px
+                name:
+                  - justify-self: start
+                  - text-align: left
+                  - padding: 0
+                  - color: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : '#7fff00';
+                      ]]]
+            - type: custom:button-card
+
+              # Display remaining drying time
+              entity: sensor.creality_pi_space_plus_drying_time
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  if (!status || ['Off', 'unknown', 'unavailable'].includes(status)) return '';
+                  return entity.state;
+                ]]]
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - padding: 0
+                  - min-height: 23px
+                  - justify-content: flex-start
+                  - align-items: flex-start
+                  - text-align: left
+                  - font-family: monospace
+                  - font-size: 16px
+                  - color: "#7fff00"
+                label:
+                  - justify-self: start
+                  - text-align: left
+                  - padding: 0
+            - type: custom:button-card
+
+              # Toggle for automatic power-on feature
+              entity: switch.creality_pi_space_plus_auto_power_on
+              triggers_update:
+              # Entities that trigger this element to update
+                - sensor.creality_pi_space_plus_dryer_status
+              show_icon: false
+              # Show/hide icon
+              show_name: false
+              # Show/hide name label
+              show_label: true
+              # Show/hide additional label
+              label: AUTO ON
+              styles:
+              # Style settings for this element
+
+                card:
+                  - background: none
+                  - box-shadow: none
+                  - border: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        if (!status || ['unavailable', 'unknown'].includes(status)) return '1px solid #808080';
+                        return entity.state === 'on' ? '1px solid orange' : '1px solid #808080';
+                      ]]]
+                  - border-radius: 15px
+                  - padding: 2px 8px
+                  - justify-content: center
+                  - align-items: center
+                  - text-align: center
+                  - min-width: 70px
+                  - min-height: 23px
+                label:
+                  - color: |
+                      [[[
+                        const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                        if (!status || ['unavailable', 'unknown'].includes(status)) return '#808080';
+                        return entity.state === 'on' ? 'orange' : '#808080';
+                      ]]]
+                  - font-size: 10px
+                  - font-weight: bold
+                  - font-family: monospace
+                  - height: 14px
+                  - line-height: 14px
+
+        # Main block with information and controls
+        - type: custom:mod-card
+          card_mod:
+            style: |
+            
+              ha-card {
+                background-color: transparent ;
+                box-shadow: none ;
+                border: none ;
+                padding: 0 ;
+              }
+              hui-horizontal-stack-card {
+                height: auto ;
+              }
+              hui-horizontal-stack-card $: |
+                #root > * {
+                  margin: 0 ;
+                }
+                #root > :first-child {
+                  width: 35% ;
+                  flex: 0 0 35% ;
+                }
+                #root > :last-child {
+                  width: 65% ;
+                  flex: 0 0 65% ;
+                }
+
+          card:
+            type: horizontal-stack
+            cards:
+              - type: entities
+                card_mod:
+                  style: |
+                    ha-card {
+                      background-color: transparent ;
+                      box-shadow: none ;
+                      border: none ;
+                      padding: 0 ;
+                      height: 40px ;
+                    }
+                    .card-content {
+                      padding: 0 ;
+                    }
+                    hui-select-entity-row {
+                      --paper-item-icon-color: #2196F3 ;
+                      --primary-text-color: #2196F3 ;
+                      --secondary-text-color: #2196F3 ;
+                      --primary-color: #2196F3 ;
+                      --mdc-select-ink-color:  ;
+                      --mdc-select-fill-color: #000000 ;
+                      --mdc-select-dropdown-icon-color: #2196F3 ;
+                      --mdc-select-label-ink-color: #2196F3 ;
+                      font-family: monospace ;
+                      font-size: 14px ;
+                    }
+                    hui-select-entity-row $ hui-generic-entity-row $ {
+                      .info {
+                        display: none ;
+                      }
+                    }
+                    state-badge {
+                      margin-left: 0 ;
+                    }
+                entities:
+
+                  # Dropdown selector for material type
+                  - entity: select.creality_pi_space_plus_select_material
+                    name: Material
+              - type: entities
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: transparent ;
+                      box-shadow: none ;
+                      border: none ;
+                      padding: 0 ;
+                      height: 55px ;
+                    }
+                    .card-content {
+                      padding: 0 ;
+                    }
+                entities:
+                  - type: custom:service-call
+                    entries:
+                      - type: slider
+
+                        # Slider to set drying time (0-48 hours)
+                        entity_id: number.creality_pi_space_plus_set_drying_time
+                        icon: ""
+                        label: ""
+                        tap_action:
+                        # Action when button is tapped
+                          action: perform-action
+                          perform_action: number.set_value
+                          data:
+                            value: "{{ value | int }}"
+                          target:
+
+                            # Slider to set drying time (0-48 hours)
+                            entity_id: number.creality_pi_space_plus_set_drying_time
+                        range:
+                          - 0
+                          - 48
+                        step: 1
+                        thumb: round
+                        unit_of_measurement: ч
+                        styles: |
+                          :host {
+                            --color: #2196F3;
+                            flex-basis: 100%;
+                            height: 35px;
+                            margin-top: 15px;
+                          }
+                          .icon-label {
+                            display: none ;
+                          }
+                          .container {
+                            padding: 0 12px;
+                          }
+                          .tooltip {
+                            --tooltip-label: '{{ value | int }} ч';
+                            --tooltip-display: flex ;
+                            --tooltip-transform: translate(var(--thumb-offset), 7px);
+                            background: transparent;
+                            color: #;
+                            padding: 0;
+                            border-radius: 0;
+                            font-family: monospace;
+                            font-size: 15px;
+                            font-weight: regular;
+                            opacity: 1;
+                            pointer-events: none;
+                          }
+  - type: horizontal-stack
+    cards:
+      - type: custom:button-card
+
+        # Control buttons section
+        # SET button - navigate through menu options
+        name: SET
+        icon: mdi:cog
+        triggers_update:
+        # Entities that trigger this element to update
+          - sensor.creality_pi_space_plus_dryer_status
+        tap_action:
+        # Action when button is tapped
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.creality_pi_space_plus_press_set
+        styles:
+        # Style settings for this element
+
+          card:
+            - height: 60px
+            - background-color: "#000000"
+            - border: 2px solid
+            # White solid border 2px thick
+            - border-radius: 8px
+            # Rounded corners (8 pixels)
+          name:
+            - color: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : 'white';
+                ]]]
+            - font-size: 14px
+          icon:
+            - color: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : '#7fff00';
+                ]]]
+      - type: custom:button-card
+
+        # UP button - increase values
+        name: UP
+        icon: mdi:chevron-up
+        triggers_update:
+        # Entities that trigger this element to update
+          - sensor.creality_pi_space_plus_dryer_status
+        tap_action:
+        # Action when button is tapped
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.creality_pi_space_plus_press_up
+        styles:
+        # Style settings for this element
+
+          card:
+            - height: 60px
+            - background-color: "#000000"
+            - border: 2px solid
+            # White solid border 2px thick
+            - border-radius: 8px
+            # Rounded corners (8 pixels)
+          name:
+            - color: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : 'white';
+                ]]]
+            - font-size: 14px
+          icon:
+            - color: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : '#7fff00';
+                ]]]
+      - type: custom:button-card
+
+        # DOWN button - decrease values
+        name: DOWN
+        icon: mdi:chevron-down
+        triggers_update:
+        # Entities that trigger this element to update
+          - sensor.creality_pi_space_plus_dryer_status
+        tap_action:
+        # Action when button is tapped
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.creality_pi_space_plus_press_down
+        styles:
+        # Style settings for this element
+
+          card:
+            - height: 60px
+            - background-color: "#000000"
+            - border: 2px solid
+            # White solid border 2px thick
+            - border-radius: 8px
+            # Rounded corners (8 pixels)
+          name:
+            - color: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : 'white';
+                ]]]
+            - font-size: 14px
+          icon:
+            - color: |
+                [[[
+                  const status = states['sensor.creality_pi_space_plus_dryer_status'].state;
+                  return !status || ['Off', 'unknown', 'unavailable'].includes(status) ? 'transparent' : '#7fff00';
+                ]]]
+      - type: custom:button-card
+
+        # START button - begin automated drying cycle
+        name: START
+        icon: mdi:play
+        tap_action:
+        # Action when button is tapped
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.creality_pi_space_plus_start_script
+        styles:
+        # Style settings for this element
+
+          card:
+            - height: 60px
+            - background-color: "#000000"
+            - border: 2px solid
+            # White solid border 2px thick
+            - border-radius: 8px
+            # Rounded corners (8 pixels)
+          name:
+            - color: white
+            - font-size: 14px
+          icon:
+            - color: "#7fff00"
+      - type: custom:button-card
+
+        # STOP button - cancel script and stop drying
+        name: STOP
+        icon: mdi:stop
+        tap_action:
+        # Action when button is tapped
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.creality_pi_space_plus_cancel_script_and_stop
+        styles:
+        # Style settings for this element
+
+          card:
+            - height: 60px
+            - background-color: "#000000"
+            - border: 2px solid
+            # White solid border 2px thick
+            - border-radius: 8px
+            # Rounded corners (8 pixels)
+          name:
+            - color: white
+            - font-size: 14px
+          icon:
+            - color: red
+      - type: custom:button-card
+
+        # POWER button - turn device on/off
+        name: POWER
+        icon: mdi:power
+        tap_action:
+        # Action when button is tapped
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.creality_pi_space_plus_press_power
+        styles:
+        # Style settings for this element
+
+          card:
+            - height: 60px
+            - background-color: "#000000"
+            - border: 2px solid
+            # White solid border 2px thick
+            - border-radius: 8px
+            # Rounded corners (8 pixels)
+          name:
+            - color: white
+            - font-size: 14px
+          icon:
+            - color: red
+
+  # Temperature and humidity graph
+  - type: custom:mini-graph-card
+    entities:
+      - entity: sensor.creality_pi_space_plus_current_temperature
+        name: Temperature
+        color: red
+      - entity: sensor.creality_pi_space_plus_set_temperature
+        name: Set
+        color: orange
+      - entity: sensor.creality_pi_space_plus_humidity
+        name: Humidity
+        color: "#2196F3"
+        y_axis: secondary
+    hours_to_show: 3
+    # Number of hours to display on the graph
+    points_per_hour: 6
+    # Data points per hour (affects graph detail)
+    line_width: 2
+    # Width of graph lines in pixels
+    hour24: true
+    font_size: 100
+    animate: true
+    show:
+      name: false
+      icon: false
+      legend: true
+      state: false
+      fill: fade
+    style: |
+      ha-card {
+        background-color: #000000 ;
+        border: 2px solid #ffffff ;
+        border-radius: 8px ;
+        padding: 10px ;
+        margin-top: 10px;
+        font-family: monospace ;
+      }
+      .header {
+        color: #ffffff ;
+        font-family: monospace ;
+      }
+      .name {
+        color: #ffffff ;
+        font-family: monospace ;
+      }
+      .graph__legend__item {
+        color: #ffffff ;
+        font-family: monospace ;
+      }
+      .graph__container__svg {
+        color: #ffffff ;
+      }
+      .graph__legend {
+        font-family: monospace ;
+        color: #ffffff ;
+      }
+      .info {
+        color: #ffffff ;
+      }
+    card_mod:
+      style: |
+        ha-card {
+          --primary-text-color: #ffffff ;
+          --secondary-text-color: #ffffff ;
+          --ha-card-background: #000000 ;
+        }

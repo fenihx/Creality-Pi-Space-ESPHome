@@ -1,0 +1,1243 @@
+# ============================================================================
+# Конфигурация ESPHome для сушилки филамента Creality Pi Space Plus
+# ============================================================================
+# Эта конфигурация создает умный контроллер для сушилки Creality Pi Space Plus
+# путем перехвата I2C коммуникации между дисплеем и главной платой.
+# Обеспечивает интеграцию с Home Assistant, автоматические циклы сушки,
+# мониторинг ошибок, адаптивное LED управление и эмуляцию физических кнопок.
+# ============================================================================
+
+esphome:
+  name: creality-pi-space-plus
+  friendly_name: Creality Pi Space Plus
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf  # Используем ESP-IDF для лучшей обработки I2C прерываний
+
+# Пользовательский компонент для перехвата I2C коммуникации
+external_components:
+  - source:
+      type: local
+      path: external_components
+
+mdns:
+  disabled: false
+
+# Настройка логирования
+logger:
+  level: INFO
+
+# API Home Assistant с шифрованием
+api:
+  encryption:
+    key: "your_encryption_key"
+
+# Обновления по воздуху (OTA)
+ota:
+  - platform: esphome
+    password: "your_password"
+
+# Настройка WiFi
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Резервная точка доступа, если WiFi не подключается
+  ap:
+    ssid: "Creality-Pi-Space-Plus"
+    password: "your_password"
+
+# Веб-сервер для локального управления устройством
+web_server:
+  port: 80
+
+# Портал для настройки WiFi
+captive_portal:
+
+# ============================================================================
+# Настройка пользовательского компонента I2C сниффера
+# ============================================================================
+# Этот компонент прослушивает I2C коммуникацию между дисплеем сушилки
+# и главной платой для извлечения данных о температуре, влажности, времени и ошибках
+# ============================================================================
+i2c_creality_pi_dryer:
+  # Конфигурация GPIO пинов для мониторинга I2C шины
+  # Эти пины можно изменить на любые доступные GPIO на вашем ESP32
+  # По умолчанию используются стандартные пины I2C для ESP32 (GPIO22=SCL, GPIO21=SDA)
+  scl_pin: 22  # Линия тактирования I2C - подключается к сигналу SCL сушилки (по умолчанию: GPIO22)
+  sda_pin: 21  # Линия данных I2C - подключается к сигналу SDA сушилки (по умолчанию: GPIO21)
+  
+  # Словарь связывания ID сенсоров
+  # Слева: Фиксированные внутренние имена компонента (НЕ изменяйте их)
+  # Справа: Настраиваемые пользователем ID сенсоров, которые должны соответствовать вашим определениям сенсоров ниже
+  # Это позволяет переименовывать сенсоры в вашей конфигурации, сохраняя
+  # правильную коммуникацию с пользовательским компонентом
+  
+  set_temp_id: set_temp          # Связь с сенсором целевой/установленной температуры
+  current_temp_id: current_temp  # Связь с сенсором текущей/процессной температуры
+  humidity_id: humidity          # Связь с сенсором влажности
+  drying_time_id: drying_time    # Связь с текстовым сенсором оставшегося времени
+  material_id: material          # Связь с текстовым сенсором типа материала
+  cursor_id: cursor_state        # Связь с текстовым сенсором позиции курсора в меню
+  temp_units_id: temp_units      # Связь с текстовым сенсором единиц температуры (C/F)
+  error_status_id: error_status  # Связь с текстовым сенсором кода ошибки
+  dryer_status_id: dryer_status  # Связь с текстовым сенсором операционного статуса
+  
+  # Пример настройки пользовательских ID сенсоров:
+  # Если хотите использовать другие имена, измените значения СПРАВА и обновите
+  # определения ваших сенсоров соответственно. Например:
+  # set_temp_id: моя_целевая_температура
+  # Затем определите: sensor: - platform: template, id: моя_целевая_температура, ...
+
+# ============================================================================
+# Глобальные переменные
+# ============================================================================
+globals:
+  # Отслеживание состояния функции автосушки (период охлаждения)
+  - id: auto_dry_cooling_down
+    type: bool
+    initial_value: 'false'
+  
+  # Целевое количество часов для цикла сушки
+  - id: target_drying_hours
+    type: int
+    initial_value: '0'
+  
+  # Список поддерживаемых материалов (должен соответствовать внутреннему порядку в сушилке)
+  - id: material_list
+    type: std::vector<std::string>
+    initial_value: '{"ABS", "ASA", "PETG", "PC", "PA", "PET", "PLA-CF", "PETG-CF", "PA-CF", "PLA", "TPU", "PP"}'
+  
+  # Имя целевого материала для автоматического выбора
+  - id: target_material_name
+    type: std::string
+    initial_value: '""'
+  
+  # Состояние навигации для обхода меню
+  - id: global_steps_remaining
+    type: int
+    initial_value: '0'
+  
+  - id: global_direction_up
+    type: bool
+    initial_value: 'true'
+  
+  - id: global_use_down_for_48
+    type: bool
+    initial_value: 'false'
+  
+  # Состояние выполнения скрипта
+  - id: is_config_running
+    type: bool
+    initial_value: 'false'
+  
+  # Состояние функции автовключения питания
+  - id: auto_power_on_active
+    type: bool
+    initial_value: 'false'
+
+# ============================================================================
+# Автоматизация на основе интервалов
+# ============================================================================
+interval:
+  # Проверка автовключения питания (каждые 30 секунд)
+  # Гарантирует, что сушилка остается включенной, когда активна функция автовключения
+  - interval: 30s
+    then:
+      - if:
+          condition:
+            and:
+              # Проверяем - активна ли функция автовключения питания
+              - lambda: 'return id(auto_power_on_active);'
+              - or:
+                  # Проверяем - выключена ли сушилка
+                  - text_sensor.state: { id: dryer_status, state: "Off" }
+                  - text_sensor.state: { id: dryer_status, state: "unknown" }
+                  - text_sensor.state: { id: dryer_status, state: "unavailable" }
+          then:
+            - switch.turn_on: button_power_raw
+            - delay: 3000ms
+
+  # Цикл защиты от ошибки E4 (каждые 60 секунд)
+  # Предотвращает ошибку перегрева E4 путем циклирования через меню, когда температура растет
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            and:
+              - switch.is_on: e4_protection
+              - text_sensor.state: { id: dryer_status, state: "Drying" }
+              # Проверяем - что температура еще не достигла установленной
+              - lambda: 'return id(set_temp).has_state() && id(current_temp).has_state() && id(set_temp).state > id(current_temp).state;'
+          then:
+            - script.execute: e4_protection_cycle
+
+# ============================================================================
+# Автоматизация на основе времени
+# ============================================================================
+time:
+  - platform: homeassistant
+    id: esptime
+    on_time:
+      # Проверка каждую минуту условий автовключения и автосушки
+      - seconds: 0
+        minutes: /1
+        then:
+          # Проверка автовключения питания
+          - if:
+              condition:
+                and:
+                  - lambda: 'return id(auto_power_on_active);'
+                  - or:
+                      - text_sensor.state: { id: dryer_status, state: "Off" }
+                      - text_sensor.state: { id: dryer_status, state: "unknown" }
+                      - text_sensor.state: { id: dryer_status, state: "unavailable" }
+              then:
+                - switch.turn_on: button_power_raw
+                - delay: 3000ms
+
+          # Триггер автосушки - когда влажность превышает порог
+          - if:
+              condition:
+                and:
+                  - switch.is_on: enable_auto_dry
+                  - text_sensor.state: { id: dryer_status, state: "Idle" }
+                  # Проверяем - что не в периоде охлаждения
+                  - lambda: 'return !id(auto_dry_cooling_down);'
+                  # Проверяем - что влажность выше порога
+                  - lambda: 'return id(humidity).state > id(auto_dry_threshold).state;'
+              then:
+                - logger.log: "Auto-Dry: Humidity is high, starting drying cycle."
+                # Устанавливаем целевую длительность
+                - lambda: 'id(target_drying_hours) = id(auto_dry_duration).state;'
+                - script.execute: set_drying_time
+                # Активируем период охлаждения
+                - lambda: 'id(auto_dry_cooling_down) = true;'
+
+# ============================================================================
+# Сенсоры
+# ============================================================================
+sensor:
+  # Целевая температура установленная пользователем
+  - platform: template
+    name: "Set Temperature"
+    id: set_temp
+    device_class: temperature
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+
+  # Текущая измеренная температура
+  - platform: template
+    name: "Current Temperature"
+    id: current_temp
+    device_class: temperature
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+
+  # Текущий уровень влажности
+  - platform: template
+    name: "Humidity"
+    id: humidity
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+
+  # Отслеживание времени работы ESP
+  - platform: uptime
+    type: seconds
+    name: Uptime Sensor
+
+# ============================================================================
+# Текстовые сенсоры
+# ============================================================================
+text_sensor:
+  # Статус ошибки с визуальной обратной связью через LED
+  - platform: template
+    name: "Error Status"
+    id: error_status
+    icon: mdi:alert-circle
+    on_value:
+      then:
+        # Проверяем - обнаружен ли код ошибки (формат E0-E9)
+        - if:
+            condition:
+              # Проверяем формат кода ошибки: 2 символа, первый 'E', второй цифра
+              lambda: |-
+                return x.length() == 2 && x[0] == 'E' && x[1] >= '0' && x[1] <= '9';
+            then:
+              - logger.log:
+                  format: "Error detected: %s - starting red blink"
+                  args: ['x.c_str()']
+              # Активируем красное мигание LED для индикации ошибки
+              - light.turn_on:
+                  id: led_light
+                  color_mode: rgb_white
+                  effect: "Red Blink"
+            else:
+              # Ошибка устранена - восстанавливаем нормальное освещение
+              - if:
+                  condition:
+                    lambda: 'return x == "OK";'
+                  then:
+                    - logger.log: "Error cleared - stopping red blink"
+                    - light.turn_on:
+                        id: led_light
+                        color_mode: rgb_white
+                        effect: none
+                    # Восстанавливаем адаптивное освещение если включено
+                    - if:
+                        condition:
+                          and:
+                            - switch.is_on: adaptive_light
+                            - lambda: 'return id(dryer_status).state != "Off";'
+                            - lambda: 'return id(humidity).has_state();'
+                        then:
+                          - if:
+                              condition:
+                                # Влажность все еще высокая
+                                lambda: 'return id(humidity).state > 20;'
+                              then:
+                                # Красный: влажность все еще высокая
+                                - light.turn_on:
+                                    id: led_light
+                                    color_mode: rgb_white
+                                    red: 100%
+                                    green: 0%
+                                    blue: 0%
+                                    white: 0%
+                              else:
+                                # Зеленый: влажность низкая (сушка завершена)
+                                - light.turn_on:
+                                    id: led_light
+                                    color_mode: rgb_white
+                                    red: 0%
+                                    green: 100%
+                                    blue: 0%
+                                    white: 0%
+                        else:
+                          - light.turn_off: led_light
+
+  # Оставшееся время сушки (формат HH:MM:SS)
+  - platform: template
+    name: "Drying Time"
+    id: drying_time
+
+  # Текущий выбранный тип материала
+  - platform: template
+    name: "Material"
+    id: material
+
+  # Текущая позиция курсора в меню на дисплее сушилки
+  - platform: template
+    name: "Cursor State"
+    id: cursor_state
+
+  # Единицы измерения температуры (C/F)
+  - platform: template
+    name: "Temperature Units"
+    id: temp_units
+
+  # Операционный статус сушилки с управлением адаптивным LED
+  - platform: template
+    name: "Dryer Status"
+    id: dryer_status
+    icon: mdi:power-cycle
+    on_value:
+      - if:
+          condition:
+            lambda: 'return x == "Off";'
+          then:
+            # Выключаем LED - когда сушилка выключена
+            - light.turn_off: led_light
+          else:
+            # Адаптивное освещение на основе влажности - когда сушилка работает
+            - if:
+                condition:
+                  and:
+                    - switch.is_on: adaptive_light
+                    - lambda: 'return id(humidity).has_state();'
+                then:
+                  - if:
+                      condition:
+                        lambda: 'return id(humidity).state > 20;'
+                      then:
+                        # Красный: высокая влажность (требуется сушка)
+                        - light.turn_on:
+                            id: led_light
+                            color_mode: rgb_white
+                            red: 100%
+                            green: 0%
+                            blue: 0%
+                            white: 0%
+                      else:
+                        # Зеленый: низкая влажность (сухо)
+                        - light.turn_on:
+                            id: led_light
+                            color_mode: rgb_white
+                            red: 0%
+                            green: 100%
+                            blue: 0%
+                            white: 0%
+                else:
+                  - light.turn_off: led_light
+
+# ============================================================================
+# Управление LED подсветкой
+# ============================================================================
+light:
+  - platform: esp32_rmt_led_strip
+    name: "Led Light"
+    id: led_light
+    pin: GPIO18
+    num_leds: 9
+    rgb_order: GRB
+    chipset: SK6812
+    is_rgbw: true
+    max_refresh_rate: 30ms
+    effects:
+      # Индикатор выполнения скрипта
+      - strobe:
+          name: Red-Blue Blink
+          colors:
+            - red: 100%
+              green: 0%
+              blue: 0%
+              white: 0%
+              duration: 500ms
+              color_mode: rgb_white
+            - red: 0%
+              green: 0%
+              blue: 100%
+              white: 0%
+              duration: 500ms
+              color_mode: rgb_white
+      # Индикатор ошибки
+      - strobe:
+          name: "Red Blink"
+          colors:
+            - red: 100%
+              green: 0%
+              blue: 0%
+              white: 0%
+              duration: 300ms
+              color_mode: rgb_white
+            - red: 0%
+              green: 0%
+              blue: 0%
+              white: 0%
+              duration: 300ms
+              color_mode: rgb_white
+
+# ============================================================================
+# Переключатели эмуляции физических кнопок (внутренние)
+# ============================================================================
+# Эти переключатели управляют GPIO пинами подключенными к физическим кнопкам сушилки
+# ============================================================================
+switch:
+  # Кнопка питания (длительность нажатия 1 секунда)
+  - platform: gpio
+    pin: { number: GPIO16, inverted: True }
+    id: button_power_raw
+    internal: true
+    on_turn_on:
+      - delay: 1000ms
+      - switch.turn_off: button_power_raw
+
+  # Кнопка вверх (длительность нажатия 100мс)
+  - platform: gpio
+    pin: { number: GPIO17, inverted: True }
+    id: button_up_raw
+    internal: true
+    on_turn_on:
+      - delay: 100ms
+      - switch.turn_off: button_up_raw
+
+  # Кнопка вниз (длительность нажатия 100мс)
+  - platform: gpio
+    pin: { number: GPIO27, inverted: True }
+    id: button_down_raw
+    internal: true
+    on_turn_on:
+      - delay: 100ms
+      - switch.turn_off: button_down_raw
+
+  # Кнопка настройки/Set (длительность нажатия 100мс)
+  - platform: gpio
+    pin: { number: GPIO25, inverted: True }
+    id: button_set_raw
+    internal: true
+    on_turn_on:
+      - delay: 100ms
+      - switch.turn_off: button_set_raw
+
+  # ============================================================================
+  # Переключатели функций (пользовательские)
+  # ============================================================================
+  
+  # Включить автоматическую сушку - когда влажность превышает порог
+  - platform: template
+    name: "Enable Auto-Dry"
+    id: enable_auto_dry
+    optimistic: true
+    icon: "mdi:brain"
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  # Автоматически поддерживать сушилку включенной
+  - platform: template
+    name: "Auto Power On"
+    id: auto_power_on
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    icon: "mdi:power-plug"
+    on_turn_on:
+      then:
+        - lambda: 'id(auto_power_on_active) = true;'
+    on_turn_off:
+      then:
+        - lambda: 'id(auto_power_on_active) = false;'
+
+  # Адаптивное LED освещение на основе влажности
+  - platform: template
+    name: "Adaptive Lighting"
+    id: adaptive_light
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    icon: "mdi:theme-light-dark"
+
+  # Защита от ошибки E4 через периодическое циклирование меню
+  - platform: template
+    name: "E4 Protection"
+    id: e4_protection
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    icon: mdi:shield-alert
+
+# ============================================================================
+# Бинарные сенсоры
+# ============================================================================
+binary_sensor:
+  # Показывает - когда любой скрипт автоматизации выполняется
+  - platform: template
+    name: "Script Running"
+    id: script_running
+    # Проверяем состояние всех скриптов
+    lambda: |-
+      return id(is_config_running) ||
+             id(start_cycle).is_running() ||
+             id(select_material_safe).is_running() ||
+             id(set_drying_time_safe).is_running() ||
+             id(set_drying_time).is_running() ||
+             id(e4_protection_cycle).is_running();
+    on_press:
+      # Показываем красно-синее мигание - пока скрипт выполняется
+      - light.turn_on:
+          id: led_light
+          color_mode: rgb_white
+          effect: "Red-Blue Blink"
+    on_release:
+      # Восстанавливаем нормальное освещение - когда скрипт завершается
+      - light.turn_off: led_light
+      - light.turn_on:
+          id: led_light
+          color_mode: rgb_white
+          effect: none
+      - if:
+          condition:
+            and:
+              - switch.is_on: adaptive_light
+              - lambda: 'return id(dryer_status).state != "Off";'
+              - lambda: 'return id(humidity).has_state();'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(humidity).state > 20;'
+                then:
+                  - light.turn_on:
+                      id: led_light
+                      color_mode: rgb_white
+                      red: 100%
+                      green: 0%
+                      blue: 0%
+                      white: 0%
+                else:
+                  - light.turn_on:
+                      id: led_light
+                      color_mode: rgb_white
+                      red: 0%
+                      green: 100%
+                      blue: 0%
+                      white: 0%
+          else:
+            - light.turn_off: led_light
+
+  # Показывает - когда автовключение питания активно пытается включить сушилку
+  - platform: template
+    name: "Auto Power Active"
+    id: auto_power_active
+    icon: "mdi:power-cycle"
+    # Проверяем - включено ли автовключение И сушилка выключена
+    lambda: |-
+      return id(auto_power_on_active) &&
+             (id(dryer_status).state == "Off" ||
+              id(dryer_status).state == "unknown" ||
+              id(dryer_status).state == "unavailable");
+
+# ============================================================================
+# Кнопки ручного управления
+# ============================================================================
+button:
+  # Эмуляция нажатий физических кнопок
+  - platform: template
+    name: "Press Power"
+    icon: mdi:power
+    on_press:
+      - switch.turn_on: button_power_raw
+
+  - platform: template
+    name: "Press Up"
+    icon: mdi:chevron-up
+    on_press:
+      - switch.turn_on: button_up_raw
+
+  - platform: template
+    name: "Press Down"
+    icon: mdi:chevron-down
+    on_press:
+      - switch.turn_on: button_down_raw
+
+  - platform: template
+    name: "Press Set"
+    icon: mdi:cog
+    on_press:
+      - switch.turn_on: button_set_raw
+
+  # Кнопки управления автоматизацией
+  - platform: template
+    name: "Start Script"
+    id: start_full_cycle
+    icon: "mdi:play-circle"
+    on_press:
+      - script.execute: start_cycle
+
+  - platform: template
+    name: "Cancel Script and Stop"
+    id: cancel_config
+    icon: "mdi:stop"
+    on_press:
+      # Останавливаем выполнение
+      - lambda: "id(is_config_running) = false;"
+      - script.stop: start_cycle
+      - script.stop: select_material_safe
+      - script.stop: set_drying_time_safe
+      # Выключаем сушилку
+      - switch.turn_on: button_power_raw
+      - delay: 1000ms
+      - logger.log: "Configuration cancelled and dryer stopped"
+
+# ============================================================================
+# Настраиваемые числовые параметры
+# ============================================================================
+number:
+  # Порог влажности для активации автосушки
+  - platform: template
+    name: "Auto-Dry Humidity Threshold"
+    id: auto_dry_threshold
+    optimistic: true
+    min_value: 20
+    max_value: 80
+    step: 1
+    unit_of_measurement: "%"
+    initial_value: 30
+    icon: "mdi:water-percent"
+    restore_value: true
+
+  # Длительность цикла автосушки
+  - platform: template
+    name: "Auto-Dry Duration"
+    id: auto_dry_duration
+    optimistic: true
+    min_value: 1
+    max_value: 48
+    step: 1
+    unit_of_measurement: "h"
+    initial_value: 4
+    icon: "mdi:clock-outline"
+    restore_value: true
+
+  # Ручная настройка времени сушки
+  - platform: template
+    name: "Set Drying Time"
+    id: set_drying_hours
+    optimistic: true
+    min_value: 0
+    max_value: 48
+    step: 1
+    unit_of_measurement: "h"
+    initial_value: 4
+    icon: "mdi:timer-outline"
+    restore_value: true
+
+# ============================================================================
+# Выбор материала
+# ============================================================================
+select:
+  - platform: template
+    name: "Select Material"
+    id: material_select
+    options:
+      - "ABS"
+      - "ASA"
+      - "PETG"
+      - "PC"
+      - "PA"
+      - "PET"
+      - "PLA-CF"
+      - "PETG-CF"
+      - "PA-CF"
+      - "PLA"
+      - "TPU"
+      - "PP"
+    initial_option: "PLA"
+    optimistic: true
+    restore_value: true
+    icon: "mdi:printer-3d-nozzle"
+
+# ============================================================================
+# Скрипты автоматизации
+# ============================================================================
+script:
+  # Полная настройка цикла сушки (материал + время)
+  - id: start_cycle
+    mode: single
+    then:
+      # Предотвращаем множественное одновременное выполнение
+      - if:
+          condition:
+            lambda: |-
+              return id(is_config_running);
+          then:
+            - script.stop: start_cycle
+      
+      # Устанавливаем флаг выполнения
+      - lambda: |-
+          id(is_config_running) = true;
+      
+      - logger.log: "Starting full drying setup..."
+      
+      # Убеждаемся - что сушилка включена
+      - if:
+          condition:
+            text_sensor.state: { id: dryer_status, state: "Off" }
+          then:
+            - switch.turn_on: button_power_raw
+            - delay: 3000ms
+      
+      # Ждем состояния простоя
+      - wait_until:
+          timeout: 15s
+          condition:
+            text_sensor.state: { id: dryer_status, state: "Idle" }
+      
+      # Сохраняем целевые настройки
+      - lambda: |-
+          id(target_material_name) = id(material_select).state;
+          id(target_drying_hours) = (int) id(set_drying_hours).state;
+          ESP_LOGI("start_cycle", "Target material: %s, Target hours: %d",
+                   id(target_material_name).c_str(), id(target_drying_hours));
+      
+      # Выполняем выбор материала
+      - script.execute: select_material_safe
+      - script.wait: select_material_safe
+      
+      # Проверяем - не была ли отменена операция
+      - if:
+          condition:
+            lambda: |-
+              return !id(is_config_running);
+          then:
+            - logger.log: "Cancelled during material selection"
+            - script.stop: start_cycle
+      
+      # Выполняем настройку времени
+      - script.execute: set_drying_time_safe
+      - script.wait: set_drying_time_safe
+      
+      # Проверяем - не была ли отменена операция
+      - if:
+          condition:
+            lambda: |-
+              return !id(is_config_running);
+          then:
+            - logger.log: "Cancelled during time setting"
+            - script.stop: start_cycle
+      
+      - logger.log: "Full drying setup complete!"
+      # Сбрасываем флаг выполнения
+      - lambda: |-
+          id(is_config_running) = false;
+
+  # Автоматизация выбора материала
+  - id: select_material_safe
+    mode: single
+    then:
+      # Проверяем - не была ли отменена конфигурация
+      - if:
+          condition:
+            lambda: |-
+              return !id(is_config_running);
+          then:
+            - logger.log: "Configuration cancelled before starting material selection"
+            - script.stop: select_material_safe
+      
+      - logger.log: "Starting material selection"
+      
+      # Убеждаемся - что сушилка включена
+      - if:
+          condition:
+            text_sensor.state: { id: dryer_status, state: "Off" }
+          then:
+            - logger.log: "Dryer is OFF, turning ON..."
+            - switch.turn_on: button_power_raw
+            - delay: 3000ms
+      
+      # Ждем - когда курсор в состоянии простоя
+      - wait_until:
+          timeout: 10s
+          condition:
+            text_sensor.state: { id: cursor_state, state: "Idle" }
+      
+      # Входим в меню
+      - logger.log: "Entering menu with SET"
+      - switch.turn_on: button_set_raw
+      - delay: 1500ms
+      
+      # Навигация до меню Material
+      - while:
+          condition:
+            not:
+              text_sensor.state: { id: cursor_state, state: "Material" }
+          then:
+            - logger.log:
+                format: "Searching for Material menu (cursor=%s)"
+                args: ['id(cursor_state).state.c_str()']
+            - switch.turn_on: button_set_raw
+            - delay: 800ms
+            # Защита от бесконечного цикла
+            - lambda: |-
+                static int tries = 0;
+                tries++;
+                if (tries > 6) {
+                  ESP_LOGE("select_material_safe", "Could not reach 'Material' menu");
+                  id(is_config_running) = false;
+                  tries = 0;
+                  return;
+                }
+      
+      - logger.log: "On 'Material' menu"
+      - delay: 1500ms
+      
+      # Вычисляем количество шагов навигации до целевого материала
+      - lambda: |-
+          std::string current = id(material).state;
+          std::string target = id(target_material_name);
+          
+          current.erase(0, current.find_first_not_of(" \t\n\r"));
+          current.erase(current.find_last_not_of(" \t\n\r") + 1);
+          target.erase(0, target.find_first_not_of(" \t\n\r"));
+          target.erase(target.find_last_not_of(" \t\n\r") + 1);
+          
+          if (current == target) {
+            ESP_LOGI("material_nav", "Material already selected: %s", current.c_str());
+            id(global_steps_remaining) = 0;
+            return;
+          }
+          
+          auto materials = id(material_list);
+          int current_idx = -1;
+          int target_idx = -1;
+          
+          for (int i = 0; i < materials.size(); i++) {
+            if (materials[i] == current) current_idx = i;
+            if (materials[i] == target) target_idx = i;
+          }
+          
+          if (current_idx == -1 || target_idx == -1) {
+            ESP_LOGE("material_nav", "Material not found in list");
+            id(is_config_running) = false;
+            return;
+          }
+          
+          int total = materials.size();
+          int steps_up = (current_idx - target_idx + total) % total;
+          int steps_down = (target_idx - current_idx + total) % total;
+          
+          if (steps_up <= steps_down) {
+            id(global_direction_up) = true;
+            id(global_steps_remaining) = steps_up;
+          } else {
+            id(global_direction_up) = false;
+            id(global_steps_remaining) = steps_down;
+          }
+          
+          ESP_LOGI("material_nav", "Need %d steps %s from %s to %s", 
+                   id(global_steps_remaining), 
+                   id(global_direction_up) ? "UP" : "DOWN",
+                   current.c_str(), target.c_str());
+      
+      # Выполняем нажатия кнопок
+      - repeat:
+          count: !lambda |-
+            return id(global_steps_remaining);
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(global_direction_up);'
+                then:
+                  - switch.turn_on: button_down_raw
+                else:
+                  - switch.turn_on: button_up_raw
+            - delay: 1500ms
+      
+      # Ждем стабилизации
+      - delay: 2000ms
+      
+      # Финальная проверка
+      - lambda: |-
+          std::string current = id(material).state;
+          std::string target = id(target_material_name);
+          
+          current.erase(0, current.find_first_not_of(" \t\n\r"));
+          current.erase(current.find_last_not_of(" \t\n\r") + 1);
+          target.erase(0, target.find_first_not_of(" \t\n\r"));
+          target.erase(target.find_last_not_of(" \t\n\r") + 1);
+          
+          if (current != target) {
+            ESP_LOGE("material_nav", "Final check failed! Current: '%s', Target: '%s'", 
+                     current.c_str(), target.c_str());
+            
+            auto materials = id(material_list);
+            int current_idx = -1;
+            int target_idx = -1;
+            
+            for (int i = 0; i < materials.size(); i++) {
+              if (materials[i] == current) current_idx = i;
+              if (materials[i] == target) target_idx = i;
+            }
+            
+            if (current_idx != -1 && target_idx != -1) {
+              int diff = (target_idx - current_idx + materials.size()) % materials.size();
+              if (diff == 1) {
+                ESP_LOGW("material_nav", "One step forward needed");
+                id(button_down_raw).turn_on();
+                delay(2000);
+              } else if (diff == materials.size() - 1) {
+                ESP_LOGW("material_nav", "One step back needed");
+                id(button_up_raw).turn_on();
+                delay(2000);
+              } else {
+                id(is_config_running) = false;
+              }
+            } else {
+              id(is_config_running) = false;
+            }
+          } else {
+            ESP_LOGI("material_nav", "Material selection successful: %s", current.c_str());
+          }
+      
+      - if:
+          condition:
+            lambda: 'return !id(is_config_running);'
+          then:
+            - logger.log: "Material selection failed!"
+          else:
+            - logger.log: "Material selection complete"
+
+  # Автоматизация настройки времени
+  - id: set_drying_time_safe
+    mode: single
+    then:
+      # Проверяем - не была ли отменена конфигурация
+      - if:
+          condition:
+            lambda: |-
+              return !id(is_config_running);
+          then:
+            - script.stop: set_drying_time_safe
+      
+      - logger.log: "Starting time setting"
+      
+      # Убеждаемся - что сушилка включена
+      - if:
+          condition:
+            text_sensor.state: { id: dryer_status, state: "Off" }
+          then:
+            - logger.log: "Dryer is OFF, turning ON..."
+            - switch.turn_on: button_power_raw
+            - delay: 3000ms
+      
+      # Навигация к Time - если еще не там
+      - if:
+          condition:
+            not:
+              text_sensor.state: { id: cursor_state, state: "Time" }
+          then:
+            - wait_until:
+                timeout: 10s
+                condition:
+                  text_sensor.state: { id: cursor_state, state: "Idle" }
+            - switch.turn_on: button_set_raw
+            - delay: 1500ms
+      
+      # Навигация до меню Time
+      - while:
+          condition:
+            not:
+              text_sensor.state: { id: cursor_state, state: "Time" }
+          then:
+            - logger.log:
+                format: "Moving to Time menu... (current: %s)"
+                args: ['id(cursor_state).state.c_str()']
+            - switch.turn_on: button_set_raw
+            - delay: 1000ms
+            # Защита от бесконечного цикла
+            - lambda: |-
+                static int loop_count = 0;
+                loop_count++;
+                if (loop_count > 5) {
+                  ESP_LOGE("set_drying_time_safe", "Too many tries, aborting.");
+                  id(is_config_running) = false;
+                  loop_count = 0;
+                  return;
+                }
+      
+      - logger.log: "Cursor on Time menu"
+      - delay: 1500ms
+      
+      # Вычисляем количество шагов до целевого времени
+      - lambda: |-
+          std::string time_str = id(drying_time).state;
+          if (time_str.length() < 2) {
+            ESP_LOGE("time_set", "Invalid time string");
+            id(is_config_running) = false;
+            return;
+          }
+          
+          int current = std::stoi(time_str.substr(0, 2));
+          int target = id(target_drying_hours);
+          
+          if (current == target) {
+            ESP_LOGI("time_nav", "Time already set: %d hours", current);
+            id(global_steps_remaining) = 0;
+            return;
+          }
+          
+          if (target == 48 && current != 48) {
+            id(global_direction_up) = false;
+            id(global_steps_remaining) = 1;
+          } else {
+            int up_steps = (target > current) ? (target - current) : (48 - current + target + 1);
+            int down_steps = (current > target) ? (current - target) : (current + 1 + 48 - target);
+            
+            if (up_steps <= down_steps) {
+              id(global_direction_up) = true;
+              id(global_steps_remaining) = up_steps;
+            } else {
+              id(global_direction_up) = false;
+              id(global_steps_remaining) = down_steps;
+            }
+          }
+          
+          ESP_LOGI("time_nav", "Need %d steps %s from %d to %d hours", 
+                   id(global_steps_remaining), 
+                   id(global_direction_up) ? "UP" : "DOWN",
+                   current, target);
+      
+      # Выполняем нажатия кнопок
+      - repeat:
+          count: !lambda |-
+            return id(global_steps_remaining);
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(global_direction_up);'
+                then:
+                  - switch.turn_on: button_up_raw
+                else:
+                  - switch.turn_on: button_down_raw
+            - delay: 1500ms
+      
+      # Ждем стабилизации
+      - delay: 2000ms
+      
+      # Финальная проверка
+      - lambda: |-
+          std::string time_str = id(drying_time).state;
+          if (time_str.length() < 2) {
+            ESP_LOGE("time_set", "Invalid time string in final check");
+            id(is_config_running) = false;
+            return;
+          }
+          
+          int current = std::stoi(time_str.substr(0, 2));
+          int target = id(target_drying_hours);
+          
+          if (current != target) {
+            ESP_LOGE("time_nav", "Final check failed! Current: %d, Target: %d", current, target);
+            
+            if ((current + 1) % 49 == target) {
+              ESP_LOGW("time_nav", "One step up needed");
+              id(button_up_raw).turn_on();
+              delay(2000);
+            } else if ((current - 1 + 49) % 49 == target) {
+              ESP_LOGW("time_nav", "One step down needed");
+              id(button_down_raw).turn_on();
+              delay(2000);
+            } else {
+              id(is_config_running) = false;
+            }
+          } else {
+            ESP_LOGI("time_nav", "Time setting successful: %d hours", current);
+          }
+      
+      - if:
+          condition:
+            lambda: 'return !id(is_config_running);'
+          then:
+            - logger.log: "Time setting failed!"
+          else:
+            - logger.log: "Time set complete, drying should start automatically"
+
+  # Упрощенный скрипт автосушки
+  - id: set_drying_time
+    mode: single
+    then:
+      - logger.log:
+          format: "Script: Setting drying time to %d hours."
+          args: ['id(target_drying_hours)']
+      
+      # Убеждаемся - что сушилка включена
+      - if:
+          condition:
+            text_sensor.state: { id: dryer_status, state: "Off" }
+          then:
+            - logger.log: "Auto-dry: Dryer is OFF, turning ON..."
+            - switch.turn_on: button_power_raw
+            - delay: 3000ms
+      
+      - wait_until:
+          condition:
+            text_sensor.state: { id: dryer_status, state: "Idle" }
+          timeout: 10s
+      
+      - switch.turn_on: button_set_raw
+      - delay: 1000ms
+      
+      # Навигация до меню Time
+      - while:
+          condition:
+            not:
+              text_sensor.state: { id: cursor_state, state: "Time" }
+          then:
+            - logger.log:
+                format: "Script: Current cursor position: %s, moving to Time"
+                args: ['id(cursor_state).state.c_str()']
+            - switch.turn_on: button_set_raw
+            - delay: 1000ms
+            # Защита от бесконечного цикла
+            - lambda: |-
+                static int loop_count = 0;
+                loop_count++;
+                if (loop_count > 5) {
+                  ESP_LOGE("set_drying_time", "Failed to navigate to Time menu");
+                  loop_count = 0;
+                  return;
+                }
+      
+      - logger.log: "Script: Now on Time menu, setting hours..."
+      - delay: 1500ms
+      
+      # Вычисляем количество шагов для автосушки
+      - lambda: |-
+          std::string time_str = id(drying_time).state;
+          if (time_str.length() < 2) {
+            ESP_LOGE("auto_dry", "Invalid time string");
+            return;
+          }
+          
+          int current = std::stoi(time_str.substr(0, 2));
+          int target = id(target_drying_hours);
+          
+          if (current == target) {
+            id(global_steps_remaining) = 0;
+            return;
+          }
+          
+          if (target == 48 && current != 48) {
+            id(global_direction_up) = false;
+            id(global_steps_remaining) = 1;
+          } else {
+            int up_steps = (target > current) ? (target - current) : (48 - current + target + 1);
+            int down_steps = (current > target) ? (current - target) : (current + 1 + 48 - target);
+            
+            if (up_steps <= down_steps) {
+              id(global_direction_up) = true;
+              id(global_steps_remaining) = up_steps;
+            } else {
+              id(global_direction_up) = false;
+              id(global_steps_remaining) = down_steps;
+            }
+          }
+          
+          ESP_LOGI("auto_dry", "Need %d steps %s from %d to %d hours", 
+                   id(global_steps_remaining), 
+                   id(global_direction_up) ? "UP" : "DOWN",
+                   current, target);
+      
+      # Выполняем нажатия кнопок
+      - repeat:
+          count: !lambda |-
+            return id(global_steps_remaining);
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(global_direction_up);'
+                then:
+                  - switch.turn_on: button_up_raw
+                else:
+                  - switch.turn_on: button_down_raw
+            - delay: 1500ms
+      
+      - delay: 2000ms
+      
+      # Финальная проверка для автосушки
+      - lambda: |-
+          std::string time_str = id(drying_time).state;
+          if (time_str.length() >= 2) {
+            int current = std::stoi(time_str.substr(0, 2));
+            int target = id(target_drying_hours);
+            
+            if (current == target) {
+              ESP_LOGI("auto_dry", "Auto-dry time set successfully: %d hours", current);
+            } else {
+              ESP_LOGE("auto_dry", "Auto-dry time setting failed! Current: %d, Target: %d", current, target);
+            }
+          }
+      
+      - logger.log: "Script: Auto-dry time setting complete."
+  - id: e4_protection_cycle
+    mode: single  
+    then:
+      - logger.log: "E4 Protection cycle running"
+      - switch.turn_on: button_set_raw
+      - delay: 500ms
+      - switch.turn_on: button_set_raw
+      - delay: 500ms
+      - switch.turn_on: button_set_raw
+      - delay: 500ms
+      - switch.turn_on: button_set_raw
+      - delay: 500ms
+      - switch.turn_on: button_down_raw
+      - delay: 500ms
+      - switch.turn_on: button_up_raw
+      - delay: 3000ms
+      - logger.log: "E4 Protection cycle complete"
