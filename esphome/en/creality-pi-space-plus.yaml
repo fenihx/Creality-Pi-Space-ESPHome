@@ -105,10 +105,6 @@ i2c_creality_pi_dryer:
 # Global Variables
 # ============================================================================
 globals:
-  # Auto-dry feature state tracking
-  - id: auto_dry_cooling_down
-    type: bool
-    initial_value: 'false'
   
   # Target hours for drying cycle
   - id: target_drying_hours
@@ -181,44 +177,24 @@ interval:
           then:
             - script.execute: e4_protection_cycle
 
-# ============================================================================
-# Time-based Automations
-# ============================================================================
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            and:
+              - switch.is_on: enable_auto_dry
+              - text_sensor.state: { id: dryer_status, state: "Idle" }
+              - lambda: 'return id(humidity).state > id(auto_dry_threshold).state;'
+          then:
+            - logger.log: "Auto-Dry: Start Cycle"
+            - lambda: 'id(target_drying_hours) = id(auto_dry_duration).state;'
+            - script.execute: set_drying_time
+
+
 time:
   - platform: homeassistant
     id: esptime
-    on_time:
-      # Check every minute for auto power-on and auto-dry conditions
-      - seconds: 0
-        minutes: /1
-        then:
-          # Auto power-on check
-          - if:
-              condition:
-                and:
-                  - lambda: 'return id(auto_power_on_active);'
-                  - or:
-                      - text_sensor.state: { id: dryer_status, state: "Off" }
-                      - text_sensor.state: { id: dryer_status, state: "unknown" }
-                      - text_sensor.state: { id: dryer_status, state: "unavailable" }
-              then:
-                - switch.turn_on: button_power_raw
-                - delay: 3000ms
-
-          # Auto-dry trigger when humidity exceeds threshold
-          - if:
-              condition:
-                and:
-                  - switch.is_on: enable_auto_dry
-                  - text_sensor.state: { id: dryer_status, state: "Idle" }
-                  - lambda: 'return !id(auto_dry_cooling_down);'
-                  - lambda: 'return id(humidity).state > id(auto_dry_threshold).state;'
-              then:
-                - logger.log: "Auto-Dry: Humidity is high, starting drying cycle."
-                - lambda: 'id(target_drying_hours) = id(auto_dry_duration).state;'
-                - script.execute: set_drying_time
-                - lambda: 'id(auto_dry_cooling_down) = true;'
-
+    
 # ============================================================================
 # Sensors
 # ============================================================================
